@@ -1,10 +1,10 @@
 import type { Computation } from "./deps.ts";
+import type { Future } from "./future.ts";
 
 export interface Effect<THandle = unknown, TResult = unknown> {
   handle: THandle;
   attributes: Attributes;
   children: Set<Effect>;
-  use<H, R>(activation: UseEffect<H,R>, options?: UseOptions<R>): Computation<Effect<H,R>>;
   destroy(): Computation<void>;
   conclusion(): Computation<TResult>;
 }
@@ -26,4 +26,24 @@ export interface UseOptions<TResult> {
 export interface Attributes extends Record<string, string | number | boolean> {
   name: string;
   type: string;
+}
+
+export interface Task<T> extends Future<T> {
+  halt(): Future<void>;
+}
+
+// Operations
+
+export type Operation<T> = OperationFunction<T> | PromiseLike<T> | Future<T> | Resource<T>;
+
+export interface Scope {
+  spawn<T>(operation: Operation<T>): Operation<Task<T>>;
+}
+
+export interface OperationFunction<T> {
+  (scope: Scope): Generator<Operation<any>, T, any>;
+}
+
+export interface Resource<T> {
+  init: Operation<T>;
 }
