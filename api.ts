@@ -4,7 +4,6 @@ import type { Future } from "./future.ts";
 export interface Effect<THandle = unknown, TResult = unknown> {
   handle: THandle;
   attributes: Attributes;
-  children: Set<Effect>;
   destroy(): Computation<void>;
   conclusion(): Computation<TResult>;
 }

@@ -21,7 +21,7 @@ type Result<T> = {
 
 export function createFuture<T>(): NewFuture<T> {
   let result: Result<T>;
-  let watchers: { resolve: K<T>; reject: K<Error> }[];
+  let watchers: { resolve: K<T>; reject: K<Error> }[] = [];
   let notifying = false;
 
   function* notify() {
@@ -108,6 +108,18 @@ export class Future<T> {
 
   static suspend(): Future<never> {
     return new Future(() => {});
+  }
+
+  static eval<T>(computation: Computation<T>): Future<T> {
+    return new Future((resolve, reject) => {
+      evaluate(function*() {
+        try {
+          resolve(yield* computation);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    })
   }
 
   constructor(fn: (resolve: Resolve<T>, reject: Reject) => void) {
