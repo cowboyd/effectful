@@ -1,3 +1,1 @@
-export * from "../../@frontside/continuation/mod.ts";
-
-export type { Block as Computation }  from "../../@frontside/continuation/mod.ts";
+export * from "https://deno.land/x/continuation@0.1.0/mod.ts";
