@@ -1,13 +1,6 @@
 import type { Computation } from "./deps.ts";
 import type { Future } from "./future.ts";
 
-export type Maybe<T> = {
-  type: "value";
-  value: T;
-} | {
-  type: "nothing";
-};
-
 export interface Handle<T = unknown> {
   value: T;
   destroy(): Computation<void>;
