@@ -1,37 +1,48 @@
-import type { Effect, UseEffect, Context } from "./api.ts";
+import type { Effect, EffectHandle, Context } from "./api.ts";
 import { Computation, reset } from "./deps.ts";
 
-export const root = new Set<Effect>();
+export const root = new Set<EffectHandle>();
 
-export function* use<T, R>(activate: UseEffect<T, R>): Computation<Effect<T, R>> {
-  return yield* createContext(root).use(activate);
+export function* use<T, O, R>(effect: Effect<T, O, R>): Computation<EffectHandle<T, O, R>> {
+  return yield* createContext(root).use(effect);
 }
 
-function createContext(effects: Set<Effect> = new Set<Effect>()): Context {
+function createContext(effects: Set<EffectHandle> = new Set<EffectHandle>()): Context {
   return {
-    *use(activate) {
-      let context = createContext();
-      let effect = yield* activate(context);
-      let { destroy } = effect;
-      let child = {
-        ...effect,
+    *use(effect) {
+      let children = new Set<EffectHandle>();
+      let context = createContext(children);
+      let instance = yield* effect.activate(context);
+
+      let { value, output, deactivate } = instance;
+
+      let handle = {
+        status: "active",
+        effect,
+        value,
+        output,
         *destroy() {
+          handle.status = "deactivating";
           try {
-            yield* destroy.call(effect);
+            for (let child of [...children].reverse()) {
+              yield* child.destroy();
+            }
+            yield* deactivate();
           } finally {
-            effects.delete(child);
+            handle.status = "deactivated";
+            effects.delete(handle);
           }
         }
       };
-      effects.add(child);
+      effects.add(handle);
       yield* reset(function*() {
         try {
-          yield* child.conclusion();
+          for (let x = yield* output(); !x.done; yield* output());
         } finally {
-          effects.delete(child);
+          effects.delete(handle);
         }
       });
-      return child;
+      return handle;
     }
   }
 }

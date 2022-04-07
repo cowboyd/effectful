@@ -1,37 +1,37 @@
 import type { Computation } from "./deps.ts";
 import type { Future } from "./future.ts";
 
-export interface Effect<THandle = unknown, TResult = unknown> {
-  handle: THandle;
-  attributes: Attributes;
+export interface Output<T, TReturn> {
+  (): Computation<IteratorResult<T, TReturn>>;
+}
+
+export interface EffectInstance<T, TOut, TResult> {
+  value: T;
+  output: Output<TOut, TResult>;
+  deactivate(): Computation<void>;
+}
+
+export interface EffectHandle<T = unknown, TOut = unknown, TResult = unknown> {
+  value: T;
+  output: Output<TOut, TResult>;
   destroy(): Computation<void>;
-  conclusion(): Computation<TResult>;
+}
+
+export interface Effect<THandle = unknown, TOut = unknown, TResult = unknown> {
+  typename: string;
+  activate(context: Context): Computation<EffectInstance<THandle, TOut, TResult>>;
 }
 
 export interface Context {
-  use<H, R>(activate: UseEffect<H,R>, options?: UseOptions<R>): Computation<Effect<H,R>>;
+  use<T,O,R>(effect: Effect<T,O,R>): Computation<EffectHandle<T,O,R>>;
 }
 
-export type CreateEffect<THandle, TResult> = Computation<Effect<THandle,TResult>>;
 
-export interface UseEffect<THandle, TResult> {
-  (context: Context): CreateEffect<THandle, TResult>;
-}
-
-export interface UseOptions<TResult> {
-  trap?(conclusion: Computation<TResult>): Computation<void>;
-}
-
-export interface Attributes extends Record<string, string | number | boolean> {
-  name: string;
-  type: string;
-}
+// Task / Operations
 
 export interface Task<T> extends Future<T> {
   halt(): Future<void>;
 }
-
-// Operations
 
 export type Operation<T> = OperationFunction<T> | PromiseLike<T> | Future<T> | Resource<T>;
 
