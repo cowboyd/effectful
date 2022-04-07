@@ -1,38 +1,42 @@
 const { test } = Deno;
 import { assertEquals } from "./asserts.ts";
 import { Future } from "../mod.ts";
-import { use, root }  from "../effect.ts";
+import { effects, use } from "../effect.ts";
 import type { Effect } from "../api.ts";
 
 type Switch = {
   on: boolean;
   toggle(): void;
-}
+};
 
-let lightswitch: Effect<Switch, never> = {
+let lightswitch: Effect<Switch> = {
   typename: "LightSwitch",
-  *activate() {
+  *activate({ ensure }) {
     let on = true;
+    yield* ensure(function* () {
+      on = false;
+    });
     return {
-      value: {
-        get on() { return on; },
-        toggle: () => { on = !on }
+      get on() {
+        return on;
       },
-      output: Future.suspend,
-      *deactivate() {
-        on = false;
-      }
-    }
-  }
-}
+      toggle() {
+        on = !on;
+      },
+    };
+  },
+};
 
 test("basic effect", async () => {
-  let effect = await Future.eval(use(lightswitch));
+  let effect = await Future.eval(() => use(lightswitch));
   let { value: light } = effect;
 
   assertEquals(light.on, true, "using the effect activates it");
-  assertEquals(root.has(effect), true, "the effect is added to the root set");
-
+  assertEquals(
+    effects.has(effect),
+    true,
+    "the effect is added to the root set",
+  );
 
   light.toggle();
 
@@ -42,36 +46,34 @@ test("basic effect", async () => {
 
   assertEquals(light.on, true, "switch did not toggle on");
 
-  await Future.eval(effect.destroy());
+  await Future.eval(() => effect.destroy());
 
   assertEquals(light.on, false, "destroying the effect de-activates it");
 
-  assertEquals(root.has(effect), false, "destroyed effect was not removed");
+  assertEquals(effects.has(effect), false, "destroyed effect was not removed");
 });
 
 test("when an effect is destroyed, it's children are also destroyed", async () => {
-  let effect = await Future.eval(use({
-    typename: "House",
-    *activate(context) {
-      let livingroom = yield* context.use(lightswitch);
-      let diningroom = yield* context.use(lightswitch);
-      return {
-        value: {
+  let effect = await Future.eval(() =>
+    use({
+      typename: "House",
+      *activate(context) {
+        let livingroom = yield* context.use(lightswitch);
+        let diningroom = yield* context.use(lightswitch);
+        return {
           livingroom: livingroom.value,
           diningroom: diningroom.value,
-        },
-        output: Future.suspend,
-        deactivate: Future.resolve,
-      }
-    }
-  }));
+        };
+      },
+    })
+  );
 
   let { value: house } = effect;
 
   assertEquals(true, house.diningroom.on);
   assertEquals(true, house.livingroom.on);
 
-  await Future.eval(effect.destroy());
+  await Future.eval(() => effect.destroy());
 
   assertEquals(false, house.diningroom.on);
   assertEquals(false, house.livingroom.on);

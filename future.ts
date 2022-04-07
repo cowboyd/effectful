@@ -2,7 +2,7 @@ import { Computation, evaluate, K, reset, shift } from "./deps.ts";
 
 export interface Future<T> extends Promise<T>, Computation<T> {}
 
-export type Resolve<T> = K<T,void>;
+export type Resolve<T> = K<T, void>;
 export type Reject = Resolve<Error>;
 
 export interface NewFuture<T> {
@@ -110,16 +110,16 @@ export class Future<T> {
     return new Future(() => {});
   }
 
-  static eval<T>(computation: Computation<T>): Future<T> {
+  static eval<T>(compute: () => Computation<T>): Future<T> {
     return new Future((resolve, reject) => {
-      evaluate(function*() {
+      evaluate(function* () {
         try {
-          resolve(yield* computation);
+          resolve(yield* compute());
         } catch (error) {
           reject(error);
         }
       });
-    })
+    });
   }
 
   constructor(fn: (resolve: Resolve<T>, reject: Reject) => void) {

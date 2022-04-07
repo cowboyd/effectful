@@ -1,48 +1,54 @@
-import type { Effect, EffectHandle, Context } from "./api.ts";
-import { Computation, reset } from "./deps.ts";
+import type { Context, Effect, Handle } from "./api.ts";
+import { Computation, evaluate, reset, shift } from "./deps.ts";
+import { Future } from "./future.ts";
 
-export const root = new Set<EffectHandle>();
+export const effects = new Set<Handle>();
 
-export function* use<T, O, R>(effect: Effect<T, O, R>): Computation<EffectHandle<T, O, R>> {
-  return yield* createContext(root).use(effect);
+export const root = evaluate<Context>(() => createContext(effects));
+
+export function* use<T>(effect: Effect<T>): Computation<Handle<T>> {
+  return yield* root.use(effect);
 }
 
-function createContext(effects: Set<EffectHandle> = new Set<EffectHandle>()): Context {
-  return {
-    *use(effect) {
-      let children = new Set<EffectHandle>();
-      let context = createContext(children);
-      let instance = yield* effect.activate(context);
+function* createContext(effects?: Set<Handle>): Computation<Context> {
+  return yield* reset(function* () {
+    let handles = effects ?? new Set();
+    let ensured: Array<() => Computation<void>> = [];
 
-      let { value, output, deactivate } = instance;
+    yield* shift<void>(function* (close) {
+      return {
+        close,
+        *use(effect) {
+          let context = yield* createContext();
+          let value = yield* effect.activate(context);
 
-      let handle = {
-        status: "active",
-        effect,
-        value,
-        output,
-        *destroy() {
-          handle.status = "deactivating";
-          try {
-            for (let child of [...children].reverse()) {
-              yield* child.destroy();
-            }
-            yield* deactivate();
-          } finally {
-            handle.status = "deactivated";
-            effects.delete(handle);
-          }
+          let handle = {
+            value,
+            *destroy() {
+              handles.delete(handle);
+              return yield* context.close();
+            },
+          };
+
+          handles.add(handle);
+
+          return handle;
+        },
+        *ensure(block) {
+          ensured.push(block);
+        },
+      } as Context;
+    });
+
+    yield* shift(function* () {
+      return Future.eval(function* () {
+        for (let ensure of ensured) {
+          yield* ensure();
         }
-      };
-      effects.add(handle);
-      yield* reset(function*() {
-        try {
-          for (let x = yield* output(); !x.done; yield* output());
-        } finally {
-          effects.delete(handle);
+        for (let child of [...handles].reverse()) {
+          yield* child.destroy();
         }
       });
-      return handle;
-    }
-  }
+    });
+  });
 }
