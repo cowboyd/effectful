@@ -4,10 +4,10 @@ import { Future } from "../mod.ts";
 import { effects, use } from "../effect.ts";
 import type { Effect } from "../api.ts";
 
-type Switch = {
+interface Switch {
   on: boolean;
   toggle(): void;
-};
+}
 
 let lightswitch: Effect<Switch> = {
   typename: "LightSwitch",
@@ -46,7 +46,7 @@ test("basic effect", async () => {
 
   assertEquals(light.on, true, "switch did not toggle on");
 
-  await Future.eval(() => effect.destroy());
+  await Future.eval(effect.destroy);
 
   assertEquals(light.on, false, "destroying the effect de-activates it");
 
