@@ -6,9 +6,9 @@ export interface Handle<T = unknown> {
   destroy(): Computation<void>;
 }
 
-export interface Effect<THandle = unknown> {
+export interface Effect<T = unknown> {
   typename: string;
-  activate(context: Context): Computation<THandle>;
+  activate(context: Context): Computation<T>;
 }
 
 export interface Context {
@@ -24,20 +24,14 @@ export interface Task<T> extends Future<T> {
 }
 
 export type Operation<T> =
-  | OperationFunction<T>
+  | Block<T>
   | PromiseLike<T>
-  | Future<T>
-  | Resource<T>
   | Effect<T>;
 
 export interface Scope {
   spawn<T>(operation: Operation<T>): Operation<Task<T>>;
 }
 
-export interface OperationFunction<T> {
+export interface Block<T> {
   (scope: Scope): Generator<Operation<unknown>, T, unknown>;
-}
-
-export interface Resource<T> {
-  init: Operation<T>;
 }
