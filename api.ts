@@ -13,11 +13,9 @@ export interface Effect<T = unknown> {
 
 export interface Context {
   use<X>(effect: Effect<X>): Computation<Handle<X>>;
-  close(): Computation<void>;
+  close(): Future<void>;
   ensure(block: () => Computation<void>): Computation<void>;
 }
-
-// Task / Operations
 
 export interface Task<T> extends Future<T> {
   halt(): Future<void>;
@@ -25,13 +23,12 @@ export interface Task<T> extends Future<T> {
 
 export type Operation<T> =
   | Block<T>
-  | PromiseLike<T>
-  | Effect<T>;
+  | PromiseLike<T>;
 
 export interface Scope {
-  spawn<T>(operation: Operation<T>): Operation<Task<T>>;
+  spawn<T>(operation: Block<T>): Operation<Task<T>>;
 }
 
 export interface Block<T> {
-  (scope: Scope): Generator<Operation<unknown>, T, unknown>;
+  (scope: Scope): Iterator<Operation<unknown>, T, unknown>;
 }
