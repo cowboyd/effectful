@@ -1,5 +1,5 @@
 import type { Block, Context, Effect, Operation, Scope, Task } from "./api.ts";
-import { evaluate, shift } from "./deps.ts";
+import { assert, evaluate, shift } from "./deps.ts";
 import { Future } from "./future.ts";
 import { root } from "./effect.ts";
 
@@ -9,9 +9,12 @@ export interface TaskOptions {
 
 export function run<T>(block: Block<T>, options: TaskOptions = {}): Task<T> {
   let { scope = createScope(root) } = options;
-  return evaluate(function*() {
-    return yield* scope.spawn(block) as Future<Task<T>>;
+  let task: Task<T> | undefined = void 0;
+  evaluate(function* () {
+    task = yield* scope.spawn(block) as Future<Task<T>>;
   });
+  assert(!!task, "PANIC: task creation was not synchronous");
+  return task;
 }
 
 function createScope(context: Context): Scope {
@@ -65,10 +68,14 @@ function createTask<T>(block: Block<T>): Effect<Task<T>> {
         }
       });
 
-      return {
-        ...future,
-        halt,
-      };
+      return Object.create(future, {
+        halt: {
+          value: halt,
+        },
+        [Symbol.toStringTag]: {
+          value: "Task",
+        },
+      });
     },
   };
 }
