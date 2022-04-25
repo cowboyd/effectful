@@ -13,7 +13,7 @@ export function run<T>(block: Block<T>, options: TaskOptions = {}): Task<T> {
   evaluate(function* () {
     task = yield* scope.spawn(block) as Future<Task<T>>;
   });
-  assert(!!task, "PANIC: task creation was not synchronous");
+  assert(task, "PANIC: task creation was not synchronous");
   return task;
 }
 
