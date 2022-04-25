@@ -47,29 +47,57 @@ export function createFuture<T>(): NewFuture<T> {
   }
 
   return evaluate<NewFuture<T>>(function* () {
+    let future: Future<T> = Object.create(Future.prototype, {
+      [Symbol.toStringTag]: { value: "Future" },
+      [Symbol.iterator]: { value },
+      //deno-lint-ignore no-explicit-any
+      then: { value: (...args: any[]) => promise().then(...args) },
+      //deno-lint-ignore no-explicit-any
+      catch: { value: (...args: any[]) => promise().catch(...args) },
+      //deno-lint-ignore no-explicit-any
+      finally: { value: (...args: any[]) => promise().finally(...args) },
+    });
+
+    // This just makes it so when you console.log a Future it is
+    // maximally helpful. It is not part of the public API
+    // console.log(Future.suspend());
+    // => Future { status: "pending" }
+    //
+    // console.log(Future.resolve(10));
+    // => Future { resolved: 10 }
+    //
+    // console.log(Future.reject(new Error("boom!")));
+    // => Future { rejected: Error { message: "boom!" } }
+    let report = future as unknown as Record<string, unknown>;
+    report.status = "pending";
+
     let settle = yield* reset<K<Result<T>>>(function* () {
       result = yield* shift<Result<T>>(function* (k) {
         return k;
       });
+      delete report.status;
+      if (result.type === "resolved") {
+        report.resolved = result.value;
+      } else {
+        report.rejected = result.error;
+      }
       yield* notify();
     });
 
-    let block: Computation<T> = {
-      *[Symbol.iterator]() {
-        return yield* shift<T>(function* (resolve, reject) {
-          watchers.push({ resolve, reject });
-          if (result) {
-            yield* notify();
-          }
-        });
-      },
-    };
+    function* value() {
+      return yield* shift<T>(function* (resolve, reject) {
+        watchers.push({ resolve, reject });
+        if (result) {
+          yield* notify();
+        }
+      });
+    }
 
     let promise = lazy(() =>
       new Promise<T>((resolve, reject) => {
         evaluate(function* () {
           try {
-            resolve(yield* block);
+            resolve(yield* value());
           } catch (error) {
             reject(error);
           }
@@ -77,15 +105,6 @@ export function createFuture<T>(): NewFuture<T> {
       })
     );
 
-    let future: Future<T> = {
-      ...block,
-      then: (...args) => promise().then(...args),
-      catch: (...args) => promise().catch(...args),
-      finally: (...args) => promise().finally(...args),
-      [Symbol.toStringTag]: "Future",
-    };
-
-    Reflect.setPrototypeOf(future, Future.prototype);
 
     return {
       future,
