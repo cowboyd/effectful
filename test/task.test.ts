@@ -1,6 +1,6 @@
 const { test } = Deno;
 import { assertEquals } from "./asserts.ts";
-import { run } from "../task.ts";
+import { run } from "../mod.ts";
 
 test({
   name: "running a synchronous task",
@@ -15,10 +15,10 @@ test({
   name: "calling a subtask",
   fn: async () => {
     let task = run(function* () {
-      let left = yield function* () {
+      let left: number = yield function* () {
         return 7;
       };
-      let right = yield function* () {
+      let right: number = yield function* () {
         return 6;
       };
       return yield function* () {
