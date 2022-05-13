@@ -30,5 +30,5 @@ export interface Scope {
 }
 
 export interface Block<T> {
-  (scope: Scope): Iterator<Operation<unknown>, T, unknown>;
+  (scope: Scope): Iterator<Operation<unknown>, T, any>;
 }
