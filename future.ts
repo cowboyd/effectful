@@ -105,7 +105,6 @@ export function createFuture<T>(): NewFuture<T> {
       })
     );
 
-
     return {
       future,
       resolve: (value: T) => settle({ type: "resolved", value }),

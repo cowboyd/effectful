@@ -1,12 +1,17 @@
-const { test } = Deno;
+import { beforeEach, describe, it } from "./bdd.ts";
 import { assertEquals } from "./asserts.ts";
 import { Future } from "../mod.ts";
 import { effects, use } from "../effect.ts";
-import type { Effect } from "../api.ts";
+import type { Effect, Handle } from "../api.ts";
 
 interface Switch {
   on: boolean;
   toggle(): void;
+}
+
+interface House {
+  diningroom: Switch;
+  livingroom: Switch;
 }
 
 let lightswitch: Effect<Switch> = {
@@ -27,56 +32,79 @@ let lightswitch: Effect<Switch> = {
   },
 };
 
-test("basic effect", async () => {
-  let effect = await Future.eval(() => use(lightswitch));
-  let { value: light } = effect;
+describe("effect", () => {
+  let handle: Handle<Switch>;
+  let light: Switch;
 
-  assertEquals(light.on, true, "using the effect activates it");
-  assertEquals(
-    effects.has(effect),
-    true,
-    "the effect is added to the root set",
-  );
+  beforeEach(async () => {
+    handle = await Future.eval(() => use(lightswitch));
+    light = handle.value;
+  });
 
-  light.toggle();
+  it("is activated on use", () => {
+    assertEquals(handle.value.on, true, "using the effect activates it");
+    assertEquals(
+      effects.has(handle),
+      true,
+      "the effect is added to the root set",
+    );
+  });
 
-  assertEquals(light.on, false, "switch did not toggle off");
+  it("can access state inside the effect", () => {
+    light.toggle();
 
-  light.toggle();
+    assertEquals(light.on, false, "switch did not toggle off");
 
-  assertEquals(light.on, true, "switch did not toggle on");
+    light.toggle();
 
-  await Future.eval(effect.destroy);
+    assertEquals(light.on, true, "switch did not toggle on");
+  });
 
-  assertEquals(light.on, false, "destroying the effect de-activates it");
+  it("is deactivated when the effect handle is destroyed", async () => {
+    await Future.eval(handle.destroy);
 
-  assertEquals(effects.has(effect), false, "destroyed effect was not removed");
+    assertEquals(light.on, false, "destroying the effect de-activates it");
+
+    assertEquals(
+      effects.has(handle),
+      false,
+      "destroyed effect was not removed",
+    );
+  });
 });
 
-test("when an effect is destroyed, it's children are also destroyed", async () => {
-  let effect = await Future.eval(() =>
-    use({
-      typename: "House",
-      *activate(context) {
-        let livingroom = yield* context.use(lightswitch);
-        let diningroom = yield* context.use(lightswitch);
-        return {
-          livingroom: livingroom.value,
-          diningroom: diningroom.value,
-        };
-      },
-    })
-  );
+describe("effect with children", () => {
+  let handle: Handle<House>;
+  let house: House;
 
-  let { value: house } = effect;
+  beforeEach(async () => {
+    handle = await Future.eval(() =>
+      use({
+        typename: "House",
+        *activate(context) {
+          let livingroom = yield* context.use(lightswitch);
+          let diningroom = yield* context.use(lightswitch);
+          return {
+            livingroom: livingroom.value,
+            diningroom: diningroom.value,
+          };
+        },
+      })
+    );
+    house = handle.value;
+  });
 
-  assertEquals(true, house.diningroom.on);
-  assertEquals(true, house.livingroom.on);
+  it("activates child effects", () => {
+    assertEquals(true, house.diningroom.on);
+    assertEquals(true, house.livingroom.on);
+  });
 
-  await Future.eval(() => effect.destroy());
+  it("destroys child effects when it itself is destroyed", async () => {
+    await Future.eval(() => handle.destroy());
 
-  assertEquals(false, house.diningroom.on);
-  assertEquals(false, house.livingroom.on);
+    assertEquals(false, house.diningroom.on);
+    assertEquals(false, house.livingroom.on);
+  });
 });
 
 // test deeply nesting activation fails up the tree
