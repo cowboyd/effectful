@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import type { Computation } from "./deps.ts";
 import type { Future } from "./future.ts";
 
